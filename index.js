@@ -5,8 +5,10 @@ const { SocketAddress } = require('net');
 const productos = require("./models/productos");
 const mensajes = require('./models/mensajes.js');
 const fs = require('fs')
-const {options} = require('./options/mariaDB');
+const { options } = require('./options/mariaDB');
 const knex = require('knex')(options);
+const { optionsSQL } = require('./options/SQLite3');
+const knexSQL = require('knex')(optionsSQL);
 
 const app = express();
 const PORT = 8080;
@@ -36,6 +38,7 @@ server = http.listen(PORT, () =>
   console.log(`Servidor HTTP escuando en el puerto ${PORT}`)
 );
 
+
 // knex.schema.dropTableIfExists('productos')
 // .then(()=>console.log('Tabla borrada...'))
 // .catch(e=>{
@@ -44,23 +47,47 @@ server = http.listen(PORT, () =>
 //     process.exit(500);
 // });
 
-knex.schema.createTable('productos', table => {
+knex.schema.createTableIfNotExists('productos', table => {
   table.increments('id'),
-  table.string('title'),
-  table.float('price'),
-  table.string('thumbnail')
+    table.string('title'),
+    table.datetime('price'),
+    table.string('thumbnail')
 })
 
-.catch(e=>{
+  .catch(e => {
     console.log('Error en proceso:', e);
     // knex.destroy();
-});
+  });
 knex.from('productos').select('*')
-    .then((productosDB)=>{
-      for (let producto of productosDB) {
-          productos.push(producto)
-      }
+  .then((productosDB) => {
+    for (let producto of productosDB) {
+      productos.push(producto)
+    }
+  })
+
+// knexSQL.schema.dropTableIfExists('mensajes')
+// .then(()=>console.log('Tabla borrada mensajes...'))
+// .catch(e=>{
+//     console.log('Error en drop:', e);
+//     knexSQL.destroy();
+//     process.exit(500);
+// });
+
+knexSQL.schema.createTableIfNotExists('mensajes', table => {
+  table.string('autor'),
+    table.string('texto'),
+    table.datetime('fecha')
 })
+  .catch(e => {
+    console.log('Error en proceso:', e);
+    knexSQL.destroy();
+  });
+knexSQL.from('mensajes').select('*')
+  .then((mensajesDB) => {
+    for (let mensaje of mensajesDB) {
+      mensajes.push(mensaje)
+    }
+  })
 
 io.on('connection', (socket) => {
   console.log('alguien se está conectado...');
@@ -77,14 +104,28 @@ io.on('connection', (socket) => {
     producto.push(productos);
 
     io.sockets.emit('listar', productos);
+
+    knex('productos').insert([producto])
+      .then((id_insertado) => {
+        producto['id'] = id_insertado[0];
+        productos.push(producto)
+        io.sockets.emit('listar', productos);
+      })
   })
 
   io.sockets.emit('mensajes', mensajes);
 
   socket.on('nuevo', (data) => {
-    mensajes.push(data);
-    fs.writeFileSync('./mensaje.txt', JSON.stringify(mensajes));
-    io.sockets.emit('mensajes', mensajes)
-  })
+    knexSQL('mensajes').insert([data])
+    .then((id_insertado) => {
+      mensajes['id'] = id_insertado[0];
+      mensajes.push(data);
 
+      knexSQL.from('mensajes').select('*')
+        .then((mensajes) => {
+          console.log(mensajes)
+        })
+      io.sockets.emit('mensajes', mensajes)
+    })
+  })
 });

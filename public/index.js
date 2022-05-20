@@ -81,7 +81,7 @@ function envioMensaje() {
     }
     let autor = document.getElementById('email').value;
     let fecha = new Date();
-    fecha = fecha.getUTCDate() + "/" + (fecha.getUTCMonth() + 1) + "/" + fecha.getUTCFullYear() + " " + fecha.getUTCHours() + ":" + fecha.getUTCMinutes() + ":" + fecha.getUTCSeconds();
+    fecha = fecha.getUTCFullYear() + "-" + (fecha.getUTCMonth() + 1) + "-" + fecha.getUTCDate() + " " + fecha.getUTCHours() + ":" + fecha.getUTCMinutes() + ":" + fecha.getUTCSeconds();
     console.log(fecha);
     let texto = document.getElementById('mensaje').value;
     socket.emit('nuevo', { autor, fecha, texto });
